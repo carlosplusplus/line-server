@@ -12,20 +12,28 @@ Rails.application.configure do
   # Show full error reports.
   config.consider_all_requests_local = true
 
-  # Enable/disable caching. By default caching is disabled.
-  # Run rails dev:cache to toggle caching.
-  if Rails.root.join('tmp', 'caching-dev.txt').exist?
-    config.action_controller.perform_caching = true
+  # In development, always have caching enabled, as it will be used with the
+  # dalli (memcached) store for file parsing and server line storage.
+  config.action_controller.perform_caching = true
 
-    config.cache_store = :memory_store
-    config.public_file_server.headers = {
-      'Cache-Control' => "public, max-age=#{2.days.to_i}"
-    }
-  else
-    config.action_controller.perform_caching = false
+  <<~CONFIGURATION_NOTES
 
-    config.cache_store = :null_store
-  end
+  1) Compression is enabled by default, which will use GZIP compression for
+     objects (lines) that are greater than 1K in size. This will optimize
+     storage constraints as lines approach the server memory limit.
+  2) A namespace is created in the event that we want to share the memcached
+     (future) cluster with other applications. Multiple applications would be
+     able to hit the same server, and guaranteed to access the correct data
+     based on this namespace.
+  3) We set NO expires_in value here, which means that the cache keys will not
+     expire, unless is application is brought down or restarted.
+
+  CONFIGURATION_NOTES
+
+  config.cache_store = :dalli_store, 'localhost', {
+    compress: true,
+    namespace: 'salsisy-line-server'
+  }
 
   # Print deprecation notices to the Rails logger.
   config.active_support.deprecation = :log
